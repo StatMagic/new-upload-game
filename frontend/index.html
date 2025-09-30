@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Uploader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Upload Game Files to S3</h1>
+    <div id="upload-form">
+        <label for="gameName">Game Name:</label>
+        <input type="text" id="gameName" name="gameName">
+
+        <label for="folderName">Folder Name:</label>
+        <input type="text" id="folderName" name="folderName" disabled>
+
+        <label for="zipFile">Optional Zip File:</label>
+        <div class="zip-input-container">
+            <input type="file" id="zipFile" name="zipFile" accept=".zip">
+            <button id="edit-packages-button" style="display: none;">Edit Packages</button>
+        </div>
+        <span id="zip-file-name" class="file-name-display"></span>
+
+        <!-- Container for single video upload is now the only option -->
+        <div id="single-video-container">
+            <label for="videoFile">Video File:</label>
+            <input type="file" id="videoFile" name="videoFile" accept="video/*">
+        </div>
+
+        <button id="uploadButton">Upload</button>
+    </div>
+    <div id="progress-container">
+        <h2>Upload Progress</h2>
+        <!-- Progress bars will be dynamically inserted here -->
+    </div>
+    <div id="result-container" style="display: none;">
+        <h2>Upload Complete</h2>
+        
+        <div class="result-section">
+            <h4>S3 Folder Link</h4>
+            <p class="description">A link to the folder containing all uploaded files in the AWS S3 Console.</p>
+            <div class="result-link-container">
+                <a id="s3-folder-link" href="#" target="_blank" rel="noopener noreferrer">View Folder</a>
+                <button id="copy-folder-link-button" class="copy-button" title="Copy link to clipboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-720v480-480Z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="result-section" id="video-object-link-container" style="display: none;">
+             <h4>Direct Video Link</h4>
+             <p class="description">A direct public link to the uploaded video file for viewing or sharing.</p>
+             <div class="result-link-container">
+                <a id="s3-object-link" href="#" target="_blank" rel="noopener noreferrer">View Video</a>
+                <button id="copy-video-link-button" class="copy-button" title="Copy link to clipboard">
+                     <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-720v480-480Z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Packages Modal -->
+    <div id="packages-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>Select Player Packages</h2>
+            <p>For each player, choose a package option.</p>
+            <div id="player-list-container">
+                <!-- Player rows will be dynamically inserted here -->
+            </div>
+            <div class="modal-actions">
+                <button id="save-packages-button" class="button-primary">Update</button>
+                <button id="cancel-packages-button" class="button-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- External libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="script.js?v=2.0.0"></script>
+</body>
+</html>
