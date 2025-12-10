@@ -132,11 +132,20 @@ uploadButton.addEventListener("click", async () => {
   try {
     const sanitizedGameName = gameName
       .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9-]/g, "");
+      .replace(/[^a-zA-Z0-9-]/g, "")
+      .replace(/-+/g, "-") // Replace multiple consecutive hyphens with single hyphen
+      .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
+
+    // Sanitize folder name to ensure it's safe for S3 paths
+    const sanitizedFolderName = finalS3Folder
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/[^a-zA-Z0-9\-_/]/g, "") // Allow alphanumeric, hyphens, underscores, and slashes
+      .replace(/\/+/g, "/") // Remove duplicate slashes
+      .replace(/^\/|\/$/g, ""); // Remove leading/trailing slashes
 
     const uploader = new S3MultipartUploader(allFilesToUpload, {
       gameName: sanitizedGameName,
-      finalS3Folder,
+      finalS3Folder: sanitizedFolderName,
       progressContainer,
     });
     await uploader.upload();
@@ -144,10 +153,10 @@ uploadButton.addEventListener("click", async () => {
     let objectKey = null;
     if (videoFile) {
       const extension = videoFile.name.split(".").pop();
-      objectKey = `full-game-footage/${finalS3Folder}/Game Video/${sanitizedGameName}.${extension}`;
+      objectKey = `full-game-footage/${sanitizedFolderName}/Game Video/${sanitizedGameName}.${extension}`;
     }
 
-    displayS3Link(BUCKET_NAME, finalS3Folder, BUCKET_REGION, objectKey);
+    displayS3Link(BUCKET_NAME, sanitizedFolderName, BUCKET_REGION, objectKey);
 
     uploadButton.textContent = "Done!";
   } catch (err) {
