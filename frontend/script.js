@@ -153,7 +153,7 @@ uploadButton.addEventListener("click", async () => {
     let objectKey = null;
     if (videoFile) {
       const extension = videoFile.name.split(".").pop();
-      objectKey = `full-game-footage/${sanitizedFolderName}/Game Video/${sanitizedGameName}.${extension}`;
+      objectKey = `full-game-footage/${sanitizedFolderName}/Game_Video/${sanitizedGameName}.${extension}`;
     }
 
     displayS3Link(BUCKET_NAME, sanitizedFolderName, BUCKET_REGION, objectKey);
@@ -201,7 +201,7 @@ class S3MultipartUploader {
     this.options.progressContainer.appendChild(progressElement);
     let s3Key;
     if (file.type.startsWith("video/")) {
-      s3Key = `full-game-footage/${this.options.finalS3Folder}/Game Video/${
+      s3Key = `full-game-footage/${this.options.finalS3Folder}/Game_Video/${
         this.options.gameName
       }.${file.name.split(".").pop()}`;
     } else if (
