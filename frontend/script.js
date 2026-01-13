@@ -211,86 +211,87 @@ class S3MultipartUploader {
   async uploadFile(file, displayName) {
     const progressElement = this.createProgressElement(displayName || "file");
     this.options.progressContainer.appendChild(progressElement);
-    let s3Key;
-    if (file.type.startsWith("video/")) {
-      s3Key = `full-game-footage/${this.options.finalS3Folder}/Game-Video/${
-        this.options.gameName
-      }.${file.name.split(".").pop()}`;
-    } else if (
-      file.type === "application/zip" ||
-      (file.name && file.name.endsWith(".zip"))
-    ) {
-      s3Key = `full-game-footage/${this.options.finalS3Folder}/Zip File/Game Info - ${this.options.gameName}.zip`;
-    } else {
-      s3Key = `full-game-footage/${this.options.finalS3Folder}/Other/${file.name}`;
-    }
+
+    const s3Key = `full-game-footage/${this.options.finalS3Folder}/Game-Video/${
+      this.options.gameName
+    }.${file.name.split(".").pop()}`;
+
     try {
       if (file.size < this.chunkSize) {
-        await this.uploadSingle(file, s3Key, progressElement);
+        const { url, contentType } = await callBackend(
+          "get-presigned-put-url",
+          {
+            key: s3Key,
+            bucket: BUCKET_NAME,
+          }
+        );
+
+        await this.uploadSingle(file, url, progressElement, contentType);
       } else {
         await this.uploadMultipart(file, s3Key, progressElement);
       }
+
       this.updateProgress(progressElement, 1, "Complete");
-    } catch (error) {
-      console.error(`Upload failed for ${displayName}:`, error);
-      this.updateProgress(progressElement, 1, `Error: ${error.message}`);
-      throw error;
+    } catch (err) {
+      console.error(`Upload failed for ${displayName}:`, err);
+      this.updateProgress(progressElement, 1, `Error: ${err.message}`);
+      throw err;
     }
   }
-  async uploadSingle(file, key, progressElement) {
-    const { url, contentType } = await callBackend("get-presigned-put-url", {
-      key,
-      bucket: BUCKET_NAME,
-    });
-    this.currentContentType = contentType;
 
+  async uploadSingle(file, url, progressElement, contentType) {
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("PUT", url, true);
-      xhr.setRequestHeader("Content-Type", file.type);
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable)
-          this.updateProgress(progressElement, event.loaded / event.total);
+      xhr.setRequestHeader("Content-Type", contentType);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          this.updateProgress(progressElement, e.loaded / e.total);
+        }
       };
+
       xhr.onload = () =>
         xhr.status >= 200 && xhr.status < 300
           ? resolve()
           : reject(new Error(`HTTP ${xhr.status}`));
-      xhr.onerror = () => reject(new Error("Network error."));
+
+      xhr.onerror = () => reject(new Error("Network error"));
       xhr.send(file);
     });
   }
+
   async uploadMultipart(file, key, progressElement) {
     const { uploadId, contentType } = await callBackend(
       "create-multipart-upload",
-      {
-        key,
-        bucket: BUCKET_NAME,
-      }
+      { key, bucket: BUCKET_NAME }
     );
-    this.currentContentType = contentType; // 🔥 REQUIRED
 
     const totalChunks = Math.ceil(file.size / this.chunkSize);
+
     const { urls } = await callBackend("get-presigned-part-urls", {
       key,
       uploadId,
       partCount: totalChunks,
       bucket: BUCKET_NAME,
     });
-    let uploadedPartsCount = 0;
-    const partUploadPromises = urls.map((url, index) => {
-      const partNumber = index + 1;
-      const start = index * this.chunkSize;
-      const end = Math.min(start + this.chunkSize, file.size);
-      const chunk = file.slice(start, end);
-      return this.uploadPart(url, chunk).then((etag) => {
-        uploadedPartsCount++;
-        this.updateProgress(progressElement, uploadedPartsCount / totalChunks);
-        return { ETag: etag, PartNumber: partNumber };
-      });
-    });
-    const parts = await Promise.all(partUploadPromises);
-    parts.sort((a, b) => a.PartNumber - b.PartNumber);
+
+    let uploaded = 0;
+
+    const parts = await Promise.all(
+      urls.map((url, index) => {
+        const start = index * this.chunkSize;
+        const end = Math.min(start + this.chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        return this.uploadPart(url, chunk, contentType).then((etag) => {
+          uploaded++;
+          this.updateProgress(progressElement, uploaded / totalChunks);
+          return { ETag: etag, PartNumber: index + 1 };
+        });
+      })
+    );
+
     await callBackend("complete-multipart-upload", {
       key,
       uploadId,
@@ -299,19 +300,22 @@ class S3MultipartUploader {
     });
   }
 
-  async uploadPart(url, chunk) {
-    const response = await fetch(url, {
+  async uploadPart(url, chunk, contentType) {
+    const res = await fetch(url, {
       method: "PUT",
+      headers: { "Content-Type": contentType },
       body: chunk,
-      headers: {
-        "Content-Type": this.currentContentType,
-      },
     });
-    if (!response.ok) throw new Error(`Part upload failed: ${response.status}`);
-    const etag = response.headers.get("ETag");
-    if (!etag) throw new Error("ETag not found in part upload response.");
+
+    if (!res.ok) {
+      throw new Error(`Part upload failed: ${res.status}`);
+    }
+
+    const etag = res.headers.get("ETag");
+    if (!etag) throw new Error("Missing ETag");
     return etag;
   }
+
   createProgressElement(fileName) {
     const element = document.createElement("div");
     element.classList.add("progress-item");
