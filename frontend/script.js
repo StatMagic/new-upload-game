@@ -39,7 +39,19 @@ copyFolderLinkButton.addEventListener("click", () =>
 copyVideoLinkButton.addEventListener("click", () =>
   copyLinkToClipboard(s3ObjectLink.href, copyVideoLinkButton)
 );
+function getContentTypeFromKey(key) {
+  const ext = key.split(".").pop().toLowerCase();
 
+  const map = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+  };
+
+  return map[ext] || "application/octet-stream";
+}
 function copyLinkToClipboard(link, buttonElement) {
   if (!link || link === "#") return;
   navigator.clipboard
@@ -226,10 +238,12 @@ class S3MultipartUploader {
     }
   }
   async uploadSingle(file, key, progressElement) {
-    const { url } = await callBackend("get-presigned-put-url", {
+    const { url, contentType } = await callBackend("get-presigned-put-url", {
       key,
       bucket: BUCKET_NAME,
     });
+    this.currentContentType = contentType;
+
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("PUT", url, true);
@@ -247,10 +261,15 @@ class S3MultipartUploader {
     });
   }
   async uploadMultipart(file, key, progressElement) {
-    const { uploadId } = await callBackend("create-multipart-upload", {
-      key,
-      bucket: BUCKET_NAME,
-    });
+    const { uploadId, contentType } = await callBackend(
+      "create-multipart-upload",
+      {
+        key,
+        bucket: BUCKET_NAME,
+      }
+    );
+    this.currentContentType = contentType; // 🔥 REQUIRED
+
     const totalChunks = Math.ceil(file.size / this.chunkSize);
     const { urls } = await callBackend("get-presigned-part-urls", {
       key,
@@ -279,8 +298,15 @@ class S3MultipartUploader {
       bucket: BUCKET_NAME,
     });
   }
+
   async uploadPart(url, chunk) {
-    const response = await fetch(url, { method: "PUT", body: chunk });
+    const response = await fetch(url, {
+      method: "PUT",
+      body: chunk,
+      headers: {
+        "Content-Type": this.currentContentType,
+      },
+    });
     if (!response.ok) throw new Error(`Part upload failed: ${response.status}`);
     const etag = response.headers.get("ETag");
     if (!etag) throw new Error("ETag not found in part upload response.");
